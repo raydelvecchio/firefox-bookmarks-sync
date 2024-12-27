@@ -7,3 +7,7 @@ Every time I add a bookmark to a folder in Firefox, I want to add it to an iClou
 * To access iCloud storage from the file system, you must navigate to `/Users/<User>/Library/Mobile Documents/com~apple~CloudDocs`
     * Cloud Docs is what is shown when you click `iCloud` on the file system in Mac
 * In the `places.sql` database Firefox maintains, any bookmark in the toolbar has a parent ID of `3`
+* This only works if iCloud is set to auto download on your target devices
+    * You can turn this on for specific folders by opening the files all on the device, holding down, and pressing `Keep Downloaded`
+    * Not only will not *not* remove those files, but it will also automatically download them when connected to internet, which is ideal!
+    
