@@ -68,6 +68,7 @@ class FirefoxBookmarkMonitor:
             raise
                 
         self.log_existing_bookmarks()
+        self.sync_all_bookmarks()
         self.last_modified = os.path.getmtime(self.places_db)
 
     def log_existing_bookmarks(self):
@@ -103,6 +104,43 @@ class FirefoxBookmarkMonitor:
 
         except Exception as e:
             print(f"Error logging existing bookmarks: {e}")
+
+    def sync_all_bookmarks(self):
+        """Syncs all bookmarks from the target folder to the drive upon startup."""
+        try:
+            temp_db = Path("/tmp/places_temp.sqlite")
+            with open(self.places_db, "rb") as src, open(temp_db, "wb") as dst:
+                dst.write(src.read())
+
+            conn = sqlite3.connect(temp_db)
+            cursor = conn.cursor()
+
+            query = """
+                SELECT moz_places.url, moz_bookmarks.title
+                FROM moz_bookmarks
+                JOIN moz_places ON moz_bookmarks.fk = moz_places.id
+                WHERE moz_bookmarks.parent IN (
+                    SELECT id FROM moz_bookmarks 
+                    WHERE title = ? AND parent = 3
+                )
+            """
+            
+            cursor.execute(query, (BOOKMARK_TOOLBAR_FOLDER_NAME,))
+            bookmarks = cursor.fetchall()
+            
+            existing_files = set(f.stem for f in self.icloud_path.iterdir() if f.is_file())  # all the existing files, by name, but not extension, in our target directory
+            new_bookmarks = [(url, title) for url, title in bookmarks if title not in existing_files]  # all bookmarks not already in there
+            
+            print(f"Syncing {len(new_bookmarks)} new bookmarks...")
+            for url, title in new_bookmarks:
+                self.handle_url(url, title)
+
+            conn.close()
+            temp_db.unlink()
+            print("Bookmark sync completed.")
+
+        except Exception as e:
+            print(f"Error syncing all bookmarks: {e}")
 
     def check(self):
         """Monitor to check if the places.sqlite file was modified and process new bookmarks if so."""
