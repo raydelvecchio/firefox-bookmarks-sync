@@ -29,26 +29,12 @@ def get_memory_usage():
         return int(output.strip()) / 1024  # convert KB to MB
     except:
         return 0 
-    
-class FileMonitor:
-    def __init__(self, path: str, callback: callable) -> None:
-        """Accepts a filepath to check on, and a callback function that runs if a change is detected."""
-        self.path = path
-        self.callback = callback
-        self.last_modified = os.path.getmtime(path)
 
-    def check(self) -> None:
-        """Monitor to check the class' filepath to see if it was modified."""
-        current_modified = os.path.getmtime(self.path)
-        if current_modified != self.last_modified:
-            self.last_modified = current_modified
-            self.callback()
-
-class FirefoxBookmarkHandler():
+class FirefoxBookmarkMonitor:
     def __init__(self):
+        print("Starting Firefox bookmark monitor...")
         self.home = Path.home()
         self.icloud_path = self.home / ICLOUD_BOOKMARKS_PATH
-        
         self.icloud_path.mkdir(parents=True, exist_ok=True)
         
         firefox_profiles = self.home / FIREFOX_PROFILES_FOLDER
@@ -82,6 +68,7 @@ class FirefoxBookmarkHandler():
             raise
                 
         self.log_existing_bookmarks()
+        self.last_modified = os.path.getmtime(self.places_db)
 
     def log_existing_bookmarks(self):
         """Logs count of existing bookmarks upon startup."""
@@ -117,8 +104,15 @@ class FirefoxBookmarkHandler():
         except Exception as e:
             print(f"Error logging existing bookmarks: {e}")
 
-    def check_new_bookmarks(self):        
-        """Checks Firefox database for new bookmarks."""
+    def check(self):
+        """Monitor to check if the places.sqlite file was modified and process new bookmarks if so."""
+        current_modified = os.path.getmtime(self.places_db)
+        if current_modified != self.last_modified:
+            self.last_modified = current_modified
+            self.process_new_bookmarks()
+
+    def process_new_bookmarks(self):        
+        """Checks Firefox database for new bookmarks and processes them."""
         try:
             temp_db = Path("/tmp/places_temp.sqlite")  # again, copy to avoid locks
             with open(self.places_db, "rb") as src, open(temp_db, "wb") as dst:
@@ -153,7 +147,7 @@ class FirefoxBookmarkHandler():
             print(f"Error processing bookmarks: {e}")
 
     def handle_url(self, url: str, title: str):
-        """What happens to the new URL that we find. Do we download and save a PDF, or save the URL?"""
+        """Handles the new URL by either downloading a PDF or saving the URL."""
         try:
             if any(re.search(pattern, url, re.IGNORECASE) for pattern in PDF_PATTERS):
                 self.download_pdf(url, title)
@@ -199,16 +193,13 @@ class FirefoxBookmarkHandler():
         except Exception as e:
             print(f"Error saving URL {url}: {e}")
 
-def main():
-    print("Starting bookmark handler")
-    
-    event_handler = FirefoxBookmarkHandler()
-    file_monitor = FileMonitor(str(event_handler.places_db), event_handler.check_new_bookmarks)
+def main():    
+    bookmark_monitor = FirefoxBookmarkMonitor()
 
     try:
         seconds_counter = 0
         while True:
-            file_monitor.check()
+            bookmark_monitor.check()
             if SHOULD_PRINT_MEMORY:
                 if seconds_counter >= PRINT_MEMORY_SECONDS:
                     memory_usage = get_memory_usage()
@@ -218,7 +209,7 @@ def main():
             if SHOULD_PRINT_MEMORY:
                 seconds_counter += CYCLE_TIME
     except KeyboardInterrupt:
-        print("Bookmark handler stopped")
+        print("Bookmark monitor stopped!")
 
 if __name__ == "__main__":
     main()
