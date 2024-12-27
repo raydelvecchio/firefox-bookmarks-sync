@@ -16,8 +16,8 @@ PDF_PATTERS = [
     r'^https://arxiv\.org/pdf/'
 ]
 CYCLE_TIME = 1
-PRINT_MEMORY_SECONDS = 1
-SHOULD_PRINT_MEMORY = True
+PRINT_MEMORY_SECONDS = 60
+SHOULD_PRINT_MEMORY = False
 
 def get_memory_usage():
     """Gets memory usage of this process without any external imports."""
