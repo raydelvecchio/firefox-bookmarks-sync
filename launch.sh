@@ -1,4 +1,7 @@
 #!/bin/bash
+set -e
+
+CRON_INTERVAL=15
 
 USERNAME=$(whoami)
 echo "Found username: $USERNAME"
@@ -13,36 +16,20 @@ fi
 
 echo "Found main.py at: $MAIN_PY"
 
-PLIST_PATH="$HOME/Library/LaunchAgents/com.$USERNAME.firefoxbookmarkmonitor.plist"
-PLIST_CONTENT="<?xml version=\"1.0\" encoding=\"UTF-8\"?>
-<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">
-<plist version=\"1.0\">
-<dict>
-    <key>Label</key>
-    <string>com.$USERNAME.firefoxbookmarkmonitor</string>
-    <key>ProgramArguments</key>
-    <array>
-        <string>/usr/bin/python3</string>
-        <string>$MAIN_PY</string>
-    </array>
-    <key>RunAtLoad</key>
-    <true/>
-    <key>KeepAlive</key>
-    <true/>
-    <key>StandardOutPath</key>
-    <string>/tmp/firefoxbookmarkmonitor.log</string>
-    <key>StandardErrorPath</key>
-    <string>/tmp/firefoxbookmarkmonitor.error.log</string>
-</dict>
-</plist>"
+chmod 755 "$MAIN_PY"
+echo "Set executable permissions for main.py"
 
-echo "$PLIST_CONTENT" > "$PLIST_PATH"
-echo "Created launch agent plist at: $PLIST_PATH"
+TEMP_CRON=$(mktemp)
 
-chmod 644 "$PLIST_PATH"
-echo "Set correct permissions for plist file"
+crontab -r 2>/dev/null || true
+echo "Cleared existing cron jobs"
 
-launchctl load "$PLIST_PATH"
-echo "Loaded launch agent"
+echo "*/$CRON_INTERVAL * * * * /opt/homebrew/bin/python3 $MAIN_PY >> /tmp/firefoxbookmarkmonitor.log 2>> /tmp/firefoxbookmarkmonitor.error.log" >> "$TEMP_CRON"
+crontab "$TEMP_CRON"
+echo "Cron job added!"
 
-echo "Setup completed successfully!"
+rm "$TEMP_CRON"
+
+echo "Setup complete: script will run every $CRON_INTERVAL minutes and log output to /tmp/firefoxbookmarkmonitor.log and errors to /tmp/firefoxbookmarkmonitor.error.log"
+echo -e "\ncrontab -l:"
+crontab -l
