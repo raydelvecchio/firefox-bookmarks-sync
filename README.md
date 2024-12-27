@@ -1,6 +1,10 @@
 # Bookmarks Sync
 Every time I add a bookmark to a folder in Firefox, I want to add it to an iCloud as well, auto downloading the PDF if there is any. This is so I can use my iPad as a reading devine. System program to monitor this!
 
+# Features
+* all in vanilla python, no external imports needed
+* customizable routes, target folders, and refresh times
+
 # Notes
 * Firefox maintains bookmarks in a SQLite file, located at `/Users/<USER>/Library/Application Support/Firefox/Profiles`, in a folder that looks like `23gbxgg0.default-release-1`, always containing `default-release`
     * Stores them in the User's Library so if uninstalled the data perserveres
@@ -10,4 +14,3 @@ Every time I add a bookmark to a folder in Firefox, I want to add it to an iClou
 * This only works if iCloud is set to auto download on your target devices
     * You can turn this on for specific folders by opening the files all on the device, holding down, and pressing `Keep Downloaded`
     * Not only will not *not* remove those files, but it will also automatically download them when connected to internet, which is ideal!
-    

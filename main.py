@@ -5,8 +5,6 @@ import sqlite3
 import http.client
 import urllib.parse
 from pathlib import Path
-from watchdog.observers import Observer
-from watchdog.events import FileSystemEventHandler
 import re
 import plistlib
 
@@ -17,9 +15,9 @@ PDF_PATTERS = [
     r'\.pdf$',
     r'^https://arxiv\.org/pdf/'
 ]
-SLEEP_SECONDS = 1
-PRINT_MEMORY_SECONDS = 60
-SHOULD_PRINT_MEMORY = False
+CYCLE_TIME = 1
+PRINT_MEMORY_SECONDS = 1
+SHOULD_PRINT_MEMORY = True
 
 def get_memory_usage():
     """Gets memory usage of this process without any external imports."""
@@ -31,8 +29,22 @@ def get_memory_usage():
         return int(output.strip()) / 1024  # convert KB to MB
     except:
         return 0 
+    
+class FileMonitor:
+    def __init__(self, path: str, callback: callable) -> None:
+        """Accepts a filepath to check on, and a callback function that runs if a change is detected."""
+        self.path = path
+        self.callback = callback
+        self.last_modified = os.path.getmtime(path)
 
-class FirefoxBookmarkHandler(FileSystemEventHandler):
+    def check(self) -> None:
+        """Monitor to check the class' filepath to see if it was modified."""
+        current_modified = os.path.getmtime(self.path)
+        if current_modified != self.last_modified:
+            self.last_modified = current_modified
+            self.callback()
+
+class FirefoxBookmarkHandler():
     def __init__(self):
         self.home = Path.home()
         self.icloud_path = self.home / ICLOUD_BOOKMARKS_PATH
@@ -104,11 +116,6 @@ class FirefoxBookmarkHandler(FileSystemEventHandler):
 
         except Exception as e:
             print(f"Error logging existing bookmarks: {e}")
-
-    def on_modified(self, event):
-        """If the watchdog detects a path is modified, then this is triggered."""
-        if Path(event.src_path) == self.places_db:
-            self.check_new_bookmarks()
 
     def check_new_bookmarks(self):        
         """Checks Firefox database for new bookmarks."""
@@ -196,29 +203,22 @@ def main():
     print("Starting bookmark handler")
     
     event_handler = FirefoxBookmarkHandler()
-    observer = Observer()
-    
-    firefox_dir = event_handler.places_db.parent
-    
-    observer.schedule(event_handler, str(firefox_dir), recursive=False)  # start the observer on the Firefox directory
-    observer.start()
+    file_monitor = FileMonitor(str(event_handler.places_db), event_handler.check_new_bookmarks)
 
     try:
         seconds_counter = 0
         while True:
+            file_monitor.check()
             if SHOULD_PRINT_MEMORY:
                 if seconds_counter >= PRINT_MEMORY_SECONDS:
                     memory_usage = get_memory_usage()
                     print(f"Current memory usage: {memory_usage:.2f} MB")
                     seconds_counter = 0
-            time.sleep(SLEEP_SECONDS)
+            time.sleep(CYCLE_TIME)
             if SHOULD_PRINT_MEMORY:
-                seconds_counter += SLEEP_SECONDS
+                seconds_counter += CYCLE_TIME
     except KeyboardInterrupt:
-        observer.stop()
         print("Bookmark handler stopped")
-
-    observer.join()
 
 if __name__ == "__main__":
     main()
