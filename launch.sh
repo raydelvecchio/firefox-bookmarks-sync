@@ -33,3 +33,8 @@ rm "$TEMP_CRON"
 echo "Setup complete: script will run every $CRON_INTERVAL_MINUTES minutes"
 echo -e "\ncrontab -l:"
 crontab -l
+
+echo "Running firefox_bookmark_monitor for the first time..."
+$EXECUTABLE >> /tmp/firefoxbookmarkmonitor.log 2>> /tmp/firefoxbookmarkmonitor.error.log
+echo "Initial run complete. Check logs for details."
+echo "To view logs, run: cat /tmp/firefoxbookmarkmonitor.log"

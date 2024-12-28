@@ -4,6 +4,7 @@ import urllib.parse
 from pathlib import Path
 import re
 import plistlib
+import datetime
 
 BOOKMARK_TOOLBAR_FOLDER_NAME = "R"
 ICLOUD_BOOKMARKS_PATH = "/Users/raydelv/Library/Mobile Documents/com~apple~CloudDocs/Bookmarks"
@@ -13,20 +14,25 @@ PDF_PATTERS = [
     r'^https://arxiv\.org/pdf/'
 ]
 
+def log(message):
+    """Prints a message to console with the current date/time, up to the second."""
+    current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"[{current_time}] {message}")
+
 def init_sync():
     """Initializes and starts syncing the bookmarks in the desired bookmark folder to iCloud."""
-    print("Starting Firefox bookmark sync...")
+    log("Starting Firefox bookmark sync...")
     icloud_path = Path(ICLOUD_BOOKMARKS_PATH)
     icloud_path.mkdir(parents=True, exist_ok=True)
     
     firefox_profiles = Path(FIREFOX_PROFILES_FOLDER)
-    print(f"Looking for Firefox profiles in: {firefox_profiles}")
+    log(f"Looking for Firefox profiles in: {firefox_profiles}")
     
     try:
         profiles = list(firefox_profiles.glob("*.default-release*"))  # have seen both .default-release and .default-release-1, both in same directory, so must check for both!
         if not profiles:  # if no default-release profile found, try listing all profiles
             profiles = list(firefox_profiles.glob("*"))
-            print(f"Available profiles: {[p.name for p in profiles]}")
+            log(f"Available profiles: {[p.name for p in profiles]}")
             
         valid_profiles = [p for p in profiles if (p / "places.sqlite").exists()]
         
@@ -35,18 +41,18 @@ def init_sync():
         
         default_profile = valid_profiles[0]
         if len(valid_profiles) > 1:
-            print(f"Multiple profiles found with places.sqlite. Using: {default_profile}")
+            log(f"Multiple profiles found with places.sqlite. Using: {default_profile}")
         
-        print(f"Found Firefox profile: {default_profile}")
+        log(f"Found Firefox profile: {default_profile}")
         
         places_db = default_profile / "places.sqlite"
         if not places_db.exists():
             raise Exception(f"places.sqlite not found at {places_db}")
         
-        print(f"Found places.sqlite at: {places_db}")
+        log(f"Found places.sqlite at: {places_db}")
         
     except Exception as e:
-        print(f"Error setting up Firefox profile: {e}")
+        log(f"Error setting up Firefox profile: {e}")
         raise
             
     log_existing_bookmarks(places_db)
@@ -76,15 +82,15 @@ def log_existing_bookmarks(places_db):
         bookmark_count = cursor.fetchone()[0]
         
         if bookmark_count > 0:
-            print(f"Found {bookmark_count} existing bookmarks in '{BOOKMARK_TOOLBAR_FOLDER_NAME}' folder")
+            log(f"Found {bookmark_count} existing bookmarks in '{BOOKMARK_TOOLBAR_FOLDER_NAME}' folder")
         else:
-            print(f"NO EXISTING bookmarks found in '{BOOKMARK_TOOLBAR_FOLDER_NAME}' folder")
+            log(f"NO EXISTING bookmarks found in '{BOOKMARK_TOOLBAR_FOLDER_NAME}' folder")
 
         conn.close()
         temp_db.unlink()
 
     except Exception as e:
-        print(f"Error logging existing bookmarks: {e}")
+        log(f"Error logging existing bookmarks: {e}")
 
 def sync_all_bookmarks(places_db, icloud_path):
     """Syncs all bookmarks from the target folder to the drive."""
@@ -112,16 +118,16 @@ def sync_all_bookmarks(places_db, icloud_path):
         existing_files = set(f.stem for f in icloud_path.iterdir() if f.is_file())  # all the existing files, by name, but not extension, in our target directory
         new_bookmarks = [(url, title) for url, title in bookmarks if title not in existing_files]  # all bookmarks not already in there
         
-        print(f"Syncing {len(new_bookmarks)} new bookmarks...")
+        log(f"Syncing {len(new_bookmarks)} new bookmarks...")
         for url, title in new_bookmarks:
             handle_url(url, title, icloud_path)
 
         conn.close()
         temp_db.unlink()
-        print("Bookmark sync completed.")
+        log("Bookmark sync completed.")
 
     except Exception as e:
-        print(f"Error syncing all bookmarks: {e}")
+        log(f"Error syncing all bookmarks: {e}")
 
 def handle_url(url: str, title: str, icloud_path: Path):
     """Handles the new URL by either downloading a PDF or saving the URL."""
@@ -131,7 +137,7 @@ def handle_url(url: str, title: str, icloud_path: Path):
         else:
             save_url(url, title, icloud_path)
     except Exception as e:
-        print(f"Error handling URL {url}: {e}")
+        log(f"Error handling URL {url}: {e}")
 
 def download_pdf(url: str, title: str, icloud_path: Path):
     """Downloads the PDF if the link saved is a PDF link. Names it the title."""
@@ -148,10 +154,10 @@ def download_pdf(url: str, title: str, icloud_path: Path):
             with open(filepath, 'wb') as f:
                 f.write(response.read())
             
-            print(f"Downloaded PDF: {filename}")
+            log(f"Downloaded PDF: {filename}")
         conn.close()
     except Exception as e:
-        print(f"Error downloading PDF {url}: {e}")
+        log(f"Error downloading PDF {url}: {e}")
 
 def save_url(url: str, title: str, icloud_path: Path):
     """Saves the URL as the title, but as a webloc file that we can open with a browser."""
@@ -166,9 +172,9 @@ def save_url(url: str, title: str, icloud_path: Path):
         with open(filepath, 'wb') as f:
             plistlib.dump(plist_content, f, fmt=plistlib.FMT_XML)
         
-        print(f"Saved .webloc shortcut: {filename}")
+        log(f"Saved .webloc shortcut: {filename}")
     except Exception as e:
-        print(f"Error saving URL {url}: {e}")
+        log(f"Error saving URL {url}: {e}")
 
 def main():    
     init_sync()
