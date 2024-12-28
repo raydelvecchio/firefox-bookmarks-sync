@@ -93,7 +93,7 @@ def log_existing_bookmarks(places_db):
         log(f"Error logging existing bookmarks: {e}")
 
 def sync_all_bookmarks(places_db, icloud_path):
-    """Syncs all bookmarks from the target folder to the drive."""
+    """Syncs all bookmarks from the target folder to the drive and removes files from the drive that don't have matching bookmarks."""
     try:
         temp_db = Path("/tmp/places_temp.sqlite")
         with open(places_db, "rb") as src, open(temp_db, "wb") as dst:
@@ -115,12 +115,20 @@ def sync_all_bookmarks(places_db, icloud_path):
         cursor.execute(query, (BOOKMARK_TOOLBAR_FOLDER_NAME,))
         bookmarks = cursor.fetchall()
         
-        existing_files = set(f.stem for f in icloud_path.iterdir() if f.is_file())  # all the existing files, by name, but not extension, in our target directory
-        new_bookmarks = [(url, title) for url, title in bookmarks if title not in existing_files]  # all bookmarks not already in there
+        bookmark_titles = set(title for _, title in bookmarks)
+        existing_files = set(f.stem for f in icloud_path.iterdir() if f.is_file())
         
+        new_bookmarks = [(url, title) for url, title in bookmarks if title not in existing_files]
         log(f"Syncing {len(new_bookmarks)} new bookmarks...")
         for url, title in new_bookmarks:
             handle_url(url, title, icloud_path)
+        
+        files_to_remove = existing_files - bookmark_titles
+        log(f"Removing {len(files_to_remove)} files without matching bookmarks...")
+        for file_name in files_to_remove:
+            file_path = next(icloud_path.glob(f"{file_name}.*"))
+            file_path.unlink()
+            log(f"Removed file: {file_path.name}")
 
         conn.close()
         temp_db.unlink()
